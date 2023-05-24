@@ -1,0 +1,7 @@
+/.vscode
+/data/__pycache__
+
+Pipfile
+Pipfile.lock
+invoice_maker.ui
+bill.png
