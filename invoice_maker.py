@@ -25,6 +25,7 @@ class InvoiceMaker(QMainWindow):
     INSERT_DATA_INTO_DATABASE = 'INSERT'
     GET_ALL_DATA_FROM_DATABASE = 'FETCH_ALL'
     DELETE_ALL_DATA = 'DELETE_ALL'
+    DELETE_SELECTED_DATA = 'DELETE_SELECTED'
 
     def __init__(self):
         super(InvoiceMaker, self).__init__()
@@ -71,6 +72,7 @@ class InvoiceMaker(QMainWindow):
         self.button_delete.clicked.connect(self.delete)
         self.button_clear_all.clicked.connect(self.clear_all)        
         self.button_print.clicked.connect(self.make_pdf)
+        self.button_clear_all.clicked.connect(self.clear_all)
 
         # Initialize 
         self.payment_input_box : QLineEdit
@@ -82,22 +84,14 @@ class InvoiceMaker(QMainWindow):
         self.tableWidget: QTableWidget
         self.label_selected_total : QLabel
         self.button_add : QPushButton 
-        self.button_print : QPushButton   
+        self.button_print : QPushButton  
+        self.button_clear_all : QPushButton 
 
         # Getting all data from database
-        items = self.database(self.GET_ALL_DATA_FROM_DATABASE) 
-        if len(items) > 0:
-            self.first_time = True
-        else:
-            self.first_time = False
+        self.initiate_table()
         
         
-        for item in items:
-            self.product = item[1]                     
-            self.unit_price = item[2]               
-            self.item_count = item[3]     
-            self.row_total = item[2] * item[3]
-            self.create_table()
+        
 
         
 
@@ -114,6 +108,23 @@ class InvoiceMaker(QMainWindow):
 
         # call Row total
         self.calculate_row_total()
+
+    def initiate_table(self):
+        items = self.database(self.GET_ALL_DATA_FROM_DATABASE) 
+        
+        print(f'database items {items}')
+        if len(items) > 0:
+
+            # create the initial table
+            for item in items:
+                self.first_time = True
+                self.product = item[1]                     
+                self.unit_price = item[2]               
+                self.item_count = item[3]     
+                self.row_total = item[2] * item[3]
+                self.create_table()
+        else:
+            self.first_time = False
         
 
     def set_unit_price(self):
@@ -169,16 +180,27 @@ class InvoiceMaker(QMainWindow):
             print('Value Error')
 
 
-    def delete():
-        pass
+    def delete(self):
+        self.selected_rows = [i.row() for i in self.tableWidget.selectedIndexes() if i.column() == 1]
+        print(self.selected_rows)
+        self.database(self.DELETE_SELECTED_DATA)
+        self.tableWidget.setRowCount(0)
+        self.row_count = 0
+        self.initiate_table()
+
+
+        
+
 
     def clear_all(self):
          self.row_count = 0
          self.tableWidget.setRowCount(0)
+         self.database(self.DELETE_ALL_DATA)
 
     def make_pdf(self):
         all_data = self.database(self.GET_ALL_DATA_FROM_DATABASE)
         print(all_data)
+        
 
 
 
@@ -210,9 +232,16 @@ class InvoiceMaker(QMainWindow):
                 return files.fetchall()
             
             elif command == self.DELETE_ALL_DATA:
-                cursor.execute('DELETE * FROM data')
+                cursor.execute('DELETE FROM data')
                 db.commit()
-            
+            elif command == self.DELETE_SELECTED_DATA:
+                row_indexes = self.selected_rows
+                ids = cursor.execute('SELECT id FROM data').fetchall()
+                print(ids)
+                for index in row_indexes:
+                    cursor.execute(f'DELETE FROM data WHERE id={ids[index][0]}')
+                db.commit()
+                
 
 
 
