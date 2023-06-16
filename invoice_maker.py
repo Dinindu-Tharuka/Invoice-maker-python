@@ -1,7 +1,7 @@
-from PyQt5.QtCore import Qt, QSortFilterProxyModel, QAbstractListModel
 from PyQt5.QtWidgets import QMainWindow, QApplication, QTableWidgetItem, QPushButton, QComboBox, QTableWidget, QLineEdit, QLabel
 from PyQt5 import uic, QtGui
 import sys
+
 # from invoice_pdf import Invoice
 import sqlite3
 from pathlib import Path
@@ -15,20 +15,16 @@ Maimi, FL
 """
 
 
-class InvoiceMaker(QMainWindow):
+class InvoiceMaker(QMainWindow):  
 
-    # Invoice Maker Data
-    product_type = ''
-    product = ''
-    unit_price = 0
-    item_count = 0
-    row_total = 0
-    payment = 0
-    customer_name = ''
-    customer_address = ''
-
+    
     # Table
-    row_count = 0
+    row_count = 0   
+
+    # Database 
+    INSERT_DATA_INTO_DATABASE = 'INSERT'
+    GET_ALL_DATA_FROM_DATABASE = 'FETCH_ALL'
+    DELETE_ALL_DATA = 'DELETE_ALL'
 
     def __init__(self):
         super(InvoiceMaker, self).__init__()
@@ -36,12 +32,21 @@ class InvoiceMaker(QMainWindow):
 
         # title
         self.setWindowTitle("Invoice Maker")
-        self.setWindowIcon(QtGui.QIcon('bill.png'))
+        self.setWindowIcon(QtGui.QIcon('bill.png'))           
+
+        # Invoice Maker Data
+        self.product_type = ''
+        self.product = ''
+        self.unit_price = 0
+        self.item_count = 0
+        self.row_total = 0
+        self.payment = 0
+        self.customer_name = ''
+        self.customer_address = ''
 
         # Function Calling
         self.initial_set_data()
-        self.set_product()        
-        
+        self.set_product()               
 
         self.show()
 
@@ -64,8 +69,8 @@ class InvoiceMaker(QMainWindow):
         # Connect Push Buttons
         self.button_add.clicked.connect(self.create_table)
         self.button_delete.clicked.connect(self.delete)
-        self.button_clear_all.clicked.connect(self.clear_all)
-        self.button_add.clicked.connect(self.add)
+        self.button_clear_all.clicked.connect(self.clear_all)        
+        self.button_print.clicked.connect(self.make_pdf)
 
         # Initialize 
         self.payment_input_box : QLineEdit
@@ -76,7 +81,24 @@ class InvoiceMaker(QMainWindow):
         self.comboBox_product: QComboBox
         self.tableWidget: QTableWidget
         self.label_selected_total : QLabel
-        self.button_add : QPushButton       
+        self.button_add : QPushButton 
+        self.button_print : QPushButton   
+
+        # Getting all data from database
+        items = self.database(self.GET_ALL_DATA_FROM_DATABASE) 
+        if len(items) > 0:
+            self.first_time = True
+        else:
+            self.first_time = False
+        
+        
+        for item in items:
+            self.product = item[1]                     
+            self.unit_price = item[2]               
+            self.item_count = item[3]     
+            self.row_total = item[2] * item[3]
+            self.create_table()
+
         
 
     def set_product(self):
@@ -105,9 +127,7 @@ class InvoiceMaker(QMainWindow):
         self.row_total = self.unit_price * self.item_count        
         self.label_selected_total.setText(str(self.row_total))
 
-    def create_table(self):
-
-        self.get_data()
+    def create_table(self):       
         
         self.tableWidget.setColumnCount(4)
         self.set_column_width()
@@ -119,9 +139,17 @@ class InvoiceMaker(QMainWindow):
         self.row_count += 1
         self.tableWidget.setRowCount(self.row_count)
         self.tableWidget.setItem((self.row_count-1), 0, QTableWidgetItem(self.product))
-        self.tableWidget.setItem((self.row_count-1), 1, QTableWidgetItem(self.unit_price))
-        self.tableWidget.setItem((self.row_count-1), 2, QTableWidgetItem(self.item_count))
-        self.tableWidget.setItem((self.row_count-1), 3, QTableWidgetItem(self.row_total))
+        self.tableWidget.setItem((self.row_count-1), 1, QTableWidgetItem(str(self.unit_price)))
+        self.tableWidget.setItem((self.row_count-1), 2, QTableWidgetItem(str(self.item_count)))
+        self.tableWidget.setItem((self.row_count-1), 3, QTableWidgetItem(str(self.row_total)))
+
+        
+
+        if not self.first_time:
+            self.get_data()            
+            self.database(self.INSERT_DATA_INTO_DATABASE)            
+
+        self.first_time = False
         
 
     def set_column_width(self):
@@ -145,10 +173,47 @@ class InvoiceMaker(QMainWindow):
         pass
 
     def clear_all(self):
-        pass
+         self.row_count = 0
+         self.tableWidget.setRowCount(0)
 
-    def add(self):
-        pass
+    def make_pdf(self):
+        all_data = self.database(self.GET_ALL_DATA_FROM_DATABASE)
+        print(all_data)
+
+
+
+    def database(self, command):
+        with sqlite3.connect('pdfdata.db') as db:
+
+            cursor = db.cursor()
+
+            cursor.execute('''CREATE TABLE IF NOT EXISTS data(
+                              id INTEGER PRIMARY KEY,
+                              product TEXT,
+                              unit_price INTEGER,
+                              item_count INTEGER
+            )''')
+
+            if command == self.INSERT_DATA_INTO_DATABASE:
+                cursor.execute(F'''INSERT INTO data(
+                                  product,
+                                  unit_price,
+                                  item_count) 
+                                  VALUES(
+                                        '{self.product}',
+                                        {self.unit_price},
+                                        {self.item_count}
+                                  )''')
+                db.commit()
+            elif command == self.GET_ALL_DATA_FROM_DATABASE:
+                files = cursor.execute('''SELECT * FROM data''')
+                return files.fetchall()
+            
+            elif command == self.DELETE_ALL_DATA:
+                cursor.execute('DELETE * FROM data')
+                db.commit()
+            
+
 
 
 app = QApplication(sys.argv)
