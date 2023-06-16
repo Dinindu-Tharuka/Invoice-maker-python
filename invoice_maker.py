@@ -7,6 +7,9 @@ import sqlite3
 from pathlib import Path
 from data.data import prices, companies, products, customers
 
+# importiing invoice maker
+from invoice_pdf import Invoice;
+
 address = """
 BILLING TO:
 Client Name:
@@ -198,8 +201,13 @@ class InvoiceMaker(QMainWindow):
          self.database(self.DELETE_ALL_DATA)
 
     def make_pdf(self):
-        all_data = self.database(self.GET_ALL_DATA_FROM_DATABASE)
-        print(all_data)
+        index = self.database(self.GET_ALL_DATA_FROM_DATABASE)
+        height = 10 * len(index) + 120
+        print(height)
+        pdf_document = Invoice("P", "mm", format=(180, height))
+        pdf_document.company_details()
+        pdf_document.create_table(self.payment)
+        pdf_document.create_pdf()
         
 
 
@@ -241,7 +249,9 @@ class InvoiceMaker(QMainWindow):
                 for index in row_indexes:
                     cursor.execute(f'DELETE FROM data WHERE id={ids[index][0]}')
                 db.commit()
-                
+
+    
+        
 
 
 
