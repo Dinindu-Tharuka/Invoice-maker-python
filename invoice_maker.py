@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QMainWindow, QApplication, QTableWidgetItem, QPushButton, QComboBox, QTableWidget, QLineEdit, QLabel
+from PyQt5.QtWidgets import QMainWindow, QApplication, QTableWidgetItem, QPushButton, QComboBox, QTableWidget, QLineEdit, QLabel, QFrame
 from PyQt5 import uic, QtGui
 import sys
 
@@ -8,7 +8,10 @@ from pathlib import Path
 from data.data import prices, companies, products, customers
 
 # importiing invoice maker
-from invoice_pdf import Invoice;
+from pdf_view.invoice_pdf import Invoice;
+
+# Datbase
+from database import Database
 
 address = """
 BILLING TO:
@@ -24,11 +27,7 @@ class InvoiceMaker(QMainWindow):
     # Table
     row_count = 0   
 
-    # Database 
-    INSERT_DATA_INTO_DATABASE = 'INSERT'
-    GET_ALL_DATA_FROM_DATABASE = 'FETCH_ALL'
-    DELETE_ALL_DATA = 'DELETE_ALL'
-    DELETE_SELECTED_DATA = 'DELETE_SELECTED'
+    
 
     def __init__(self):
         super(InvoiceMaker, self).__init__()
@@ -36,7 +35,10 @@ class InvoiceMaker(QMainWindow):
 
         # title
         self.setWindowTitle("Invoice Maker")
-        self.setWindowIcon(QtGui.QIcon('bill.png'))           
+        self.setWindowIcon(QtGui.QIcon('bill.png'))  
+        self.frame : QFrame
+        self.frame.setStyleSheet('background-color:#98a2a3')   
+            
 
         # Invoice Maker Data
         self.product_type = ''
@@ -91,6 +93,7 @@ class InvoiceMaker(QMainWindow):
         self.button_clear_all : QPushButton 
 
         # Getting all data from database
+        self.database = Database()
         self.initiate_table()
         
         
@@ -113,9 +116,9 @@ class InvoiceMaker(QMainWindow):
         self.calculate_row_total()
 
     def initiate_table(self):
-        items = self.database(self.GET_ALL_DATA_FROM_DATABASE) 
+        items = self.database.read(self.database.GET_ALL_DATA_FROM_DATABASE) 
         
-        print(f'database items {items}')
+       
         if len(items) > 0:
 
             # create the initial table
@@ -161,7 +164,7 @@ class InvoiceMaker(QMainWindow):
 
         if not self.first_time:
             self.get_data()            
-            self.database(self.INSERT_DATA_INTO_DATABASE)            
+            self.database.read(self.database.INSERT_DATA_INTO_DATABASE)            
 
         self.first_time = False
         
@@ -177,7 +180,7 @@ class InvoiceMaker(QMainWindow):
             self.product = self.comboBox_product.currentText()
             self.unit_price = self.lineEdit_unit_price.text()
             self.item_count = self.comboBox_unit_count.currentText()            
-            self.payment = self.payment_input_box.text()
+            self.payment = float(self.payment_input_box.text())
             self.row_total = self.label_selected_total.text()
         except:
             print('Value Error')
@@ -186,7 +189,7 @@ class InvoiceMaker(QMainWindow):
     def delete(self):
         self.selected_rows = [i.row() for i in self.tableWidget.selectedIndexes() if i.column() == 1]
         print(self.selected_rows)
-        self.database(self.DELETE_SELECTED_DATA)
+        self.database.read(self.database.DELETE_SELECTED_DATA)
         self.tableWidget.setRowCount(0)
         self.row_count = 0
         self.initiate_table()
@@ -198,59 +201,17 @@ class InvoiceMaker(QMainWindow):
     def clear_all(self):
          self.row_count = 0
          self.tableWidget.setRowCount(0)
-         self.database(self.DELETE_ALL_DATA)
+         self.database.read(self.database.DELETE_ALL_DATA)
 
     def make_pdf(self):
-        index = self.database(self.GET_ALL_DATA_FROM_DATABASE)
-        height = 10 * len(index) + 120
-        print(height)
+        self.get_data()
+        print(self.payment)
+        index = self.database.read(self.database.GET_ALL_DATA_FROM_DATABASE)
+        height = 10 * len(index) + 120        
         pdf_document = Invoice("P", "mm", format=(180, height))
         pdf_document.company_details()
         pdf_document.create_table(self.payment)
         pdf_document.create_pdf()
-        
-
-
-
-    def database(self, command):
-        with sqlite3.connect('pdfdata.db') as db:
-
-            cursor = db.cursor()
-
-            cursor.execute('''CREATE TABLE IF NOT EXISTS data(
-                              id INTEGER PRIMARY KEY,
-                              product TEXT,
-                              unit_price INTEGER,
-                              item_count INTEGER
-            )''')
-
-            if command == self.INSERT_DATA_INTO_DATABASE:
-                cursor.execute(F'''INSERT INTO data(
-                                  product,
-                                  unit_price,
-                                  item_count) 
-                                  VALUES(
-                                        '{self.product}',
-                                        {self.unit_price},
-                                        {self.item_count}
-                                  )''')
-                db.commit()
-            elif command == self.GET_ALL_DATA_FROM_DATABASE:
-                files = cursor.execute('''SELECT * FROM data''')
-                return files.fetchall()
-            
-            elif command == self.DELETE_ALL_DATA:
-                cursor.execute('DELETE FROM data')
-                db.commit()
-            elif command == self.DELETE_SELECTED_DATA:
-                row_indexes = self.selected_rows
-                ids = cursor.execute('SELECT id FROM data').fetchall()
-                print(ids)
-                for index in row_indexes:
-                    cursor.execute(f'DELETE FROM data WHERE id={ids[index][0]}')
-                db.commit()
-
-    
         
 
 

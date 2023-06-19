@@ -1,4 +1,5 @@
 from fpdf import FPDF
+import sqlite3 
 
 
 class Invoice(FPDF):
@@ -8,6 +9,8 @@ class Invoice(FPDF):
     Street Avenue 0000
     Maimi, FL
     """
+
+    GETTING_ALL_DATA = 'GET_ALL_DATA'
 
     def company_details(self):
         self.add_page()
@@ -32,7 +35,11 @@ class Invoice(FPDF):
         self.set_x(10)
         self.multi_cell(0, 5, self.address,new_x="LMARGIN", new_y="NEXT" )
 
-    def create_table(self, ids, products, prices, qtys, totals, payment=0):
+    def create_table(self, payment=0):
+
+        rows = self.database(self.GETTING_ALL_DATA)
+        print("payment = " + str(payment))
+        
 
         total_price = 0
         self.set_font("helvetica", "", 11)
@@ -52,15 +59,15 @@ class Invoice(FPDF):
 
         self.set_margin(10)
 
-
-
-        for index in range(len(ids)):
-            self.cell(self.page_width * 0.05, 10, f"{ids[index]}", fill=True, align="C", border="T")
-            self.cell(self.page_width * 0.4, 10, f"{products[index]}", fill=True, border="T")
-            self.cell(self.page_width * 0.15, 10,f"{prices[index]}", fill=True, border="T")
-            self.cell(self.page_width * 0.1, 10,f"{qtys[index]}", fill=True, border="T")
-            self.cell(self.page_width * 0.2, 10, f"{totals[index]}", fill=True, align="C", new_x="LMARGIN", new_y="NEXT", border="T")
-            total_price += float(totals[index])
+        index = 0
+        for row in rows:
+            self.cell(self.page_width * 0.05, 10, f"{index}", fill=True, align="C", border="T")
+            self.cell(self.page_width * 0.4, 10, f"{row[1]}", fill=True, border="T")
+            self.cell(self.page_width * 0.15, 10,f"{row[2]}", fill=True, border="T")
+            self.cell(self.page_width * 0.1, 10,f"{row[3]}", fill=True, border="T")
+            self.cell(self.page_width * 0.2, 10, f"{row[2] * row[3]}", fill=True, align="C", new_x="LMARGIN", new_y="NEXT", border="T")
+            total_price += float(row[2] * row[3])
+            index += 1
 
 
 
@@ -76,6 +83,18 @@ class Invoice(FPDF):
         self.cell(self.page_width * 0.60, 10, "", fill=True)
         self.cell(self.page_width * 0.1, 10, "Change", fill=True, align="R")
         self.cell(self.page_width * 0.2, 10, f"{payment - total_price}", fill=True, align="C", new_x="LMARGIN", new_y="NEXT")
+
+        
+
+    
+    def database(self, command):
+
+        with sqlite3.connect('pdfdata.db') as db:
+            cursor = db.cursor()
+
+            if command == self.GETTING_ALL_DATA:
+                file_list = cursor.execute('SELECT * FROM data').fetchall()
+                return file_list
 
 
 
